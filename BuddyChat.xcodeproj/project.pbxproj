@@ -19,6 +19,9 @@
 		C11A61522472A6D4005FAF94 /* ChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C11A61512472A6D4005FAF94 /* ChatView.swift */; };
 		C11A61562472A814005FAF94 /* ChatViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C11A61552472A814005FAF94 /* ChatViewModel.swift */; };
 		C11A61592472B506005FAF94 /* View+Helpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = C11A61582472B506005FAF94 /* View+Helpers.swift */; };
+		C11A615B2475492D005FAF94 /* BLEPeripheralComunicationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C11A615A2475492D005FAF94 /* BLEPeripheralComunicationService.swift */; };
+		C11A615F247550F6005FAF94 /* BLECentralComunicationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C11A615E247550F6005FAF94 /* BLECentralComunicationService.swift */; };
+		C11A61622475615F005FAF94 /* ChatTypeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C11A61612475615F005FAF94 /* ChatTypeView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -36,6 +39,9 @@
 		C11A61512472A6D4005FAF94 /* ChatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatView.swift; sourceTree = "<group>"; };
 		C11A61552472A814005FAF94 /* ChatViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatViewModel.swift; sourceTree = "<group>"; };
 		C11A61582472B506005FAF94 /* View+Helpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "View+Helpers.swift"; sourceTree = "<group>"; };
+		C11A615A2475492D005FAF94 /* BLEPeripheralComunicationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BLEPeripheralComunicationService.swift; sourceTree = "<group>"; };
+		C11A615E247550F6005FAF94 /* BLECentralComunicationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BLECentralComunicationService.swift; sourceTree = "<group>"; };
+		C11A61612475615F005FAF94 /* ChatTypeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatTypeView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -95,6 +101,8 @@
 			children = (
 				C11A6142246FEC65005FAF94 /* ComunicationService.swift */,
 				C11A6147246FF9D8005FAF94 /* MultipeerComunicationService.swift */,
+				C11A615A2475492D005FAF94 /* BLEPeripheralComunicationService.swift */,
+				C11A615E247550F6005FAF94 /* BLECentralComunicationService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -102,6 +110,7 @@
 		C11A61492472A2EF005FAF94 /* Scenes */ = {
 			isa = PBXGroup;
 			children = (
+				C11A616024756135005FAF94 /* TypeSelect */,
 				C11A614A2472A2F6005FAF94 /* Chat */,
 			);
 			path = Scenes;
@@ -147,6 +156,14 @@
 				C11A61582472B506005FAF94 /* View+Helpers.swift */,
 			);
 			path = Extensions;
+			sourceTree = "<group>";
+		};
+		C11A616024756135005FAF94 /* TypeSelect */ = {
+			isa = PBXGroup;
+			children = (
+				C11A61612475615F005FAF94 /* ChatTypeView.swift */,
+			);
+			path = TypeSelect;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -228,6 +245,9 @@
 				C11A61522472A6D4005FAF94 /* ChatView.swift in Sources */,
 				C11A6143246FEC65005FAF94 /* ComunicationService.swift in Sources */,
 				C11A61562472A814005FAF94 /* ChatViewModel.swift in Sources */,
+				C11A615F247550F6005FAF94 /* BLECentralComunicationService.swift in Sources */,
+				C11A615B2475492D005FAF94 /* BLEPeripheralComunicationService.swift in Sources */,
+				C11A61622475615F005FAF94 /* ChatTypeView.swift in Sources */,
 				C11A61502472A439005FAF94 /* Message.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -366,7 +386,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_ASSET_PATHS = "\"BuddyChat/Preview Content\"";
-				DEVELOPMENT_TEAM = XC4P84J273;
+				DEVELOPMENT_TEAM = 88P9HXYC2A;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = BuddyChat/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -386,7 +406,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_ASSET_PATHS = "\"BuddyChat/Preview Content\"";
-				DEVELOPMENT_TEAM = XC4P84J273;
+				DEVELOPMENT_TEAM = 88P9HXYC2A;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = BuddyChat/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (

@@ -21,11 +21,19 @@ class ChatViewModel : ObservableObject {
         notificationCenter = center
         notificationCenter.addObserver(self, selector: #selector(keyBoardWillShow(notification:)), name: UIResponder.keyboardWillShowNotification, object: nil)
         notificationCenter.addObserver(self, selector: #selector(keyBoardWillHide(notification:)), name: UIResponder.keyboardWillHideNotification, object: nil)
+    }
+
+    func startChatting() {
+        service.start(with: self)
+    }
+
+    func stopChatting() {
         service.start(with: self)
     }
 
     deinit {
         notificationCenter.removeObserver(self)
+        stopChatting()
     }
 
     @objc func keyBoardWillShow(notification: Notification) {
@@ -40,8 +48,10 @@ class ChatViewModel : ObservableObject {
 
     func sendMessage(_ message: String) {
         switch service.sendMessage(message) {
-        case .success:
-            messages.insert(Message(message: message, user: "Me", isFromMe: true), at: 0)
+        case .success(let flag):
+            if flag {
+                messages.insert(Message(message: message, user: "Me", isFromMe: true), at: 0)
+            }
         case .failure(let error):
             self.errorMessage = error.localizedDescription
         }

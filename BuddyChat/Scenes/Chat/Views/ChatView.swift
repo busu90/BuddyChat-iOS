@@ -1,10 +1,11 @@
 import SwiftUI
 
 struct ChatView: View {
-    @EnvironmentObject var viewModel: ChatViewModel
+    @ObservedObject var viewModel: ChatViewModel
     @State var currMessage: String = ""
 
-    init() {
+    init(_ viewModel: ChatViewModel) {
+        self.viewModel = viewModel
         UITableView.appearance().separatorStyle = .none
         UITableView.appearance().tableFooterView = UIView()
     }
@@ -35,6 +36,12 @@ struct ChatView: View {
                 .alert(isPresented: $viewModel.hasError) {
                     Alert(title: Text("Error"), message: Text(viewModel.errorMessage ?? "There was a problem executing request, please try again!"), dismissButton: .default(Text("OK")))
             }
+            .onAppear {
+                self.viewModel.startChatting()
+            }
+            .onDisappear{
+                self.viewModel.stopChatting()
+            }
         }
     }
 
@@ -47,6 +54,6 @@ struct ChatView: View {
 
 struct ChatView_Previews: PreviewProvider {
     static var previews: some View {
-        ChatView().environmentObject(ChatViewModel(service: MultipeerComunicationService()))
+        ChatView(ChatViewModel(service: MultipeerComunicationService()))
     }
 }

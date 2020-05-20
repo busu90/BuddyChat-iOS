@@ -41,14 +41,18 @@ final class MultipeerComunicationService: NSObject, ComunicationService {
     }
 
     deinit {
-        self.serviceAdvertiser.stopAdvertisingPeer()
-        self.serviceBrowser.stopBrowsingForPeers()
+        stop()
     }
 
     func start(with delegate: ComunicationServiceDelegate) {
         self.delegate = delegate
         self.serviceAdvertiser.startAdvertisingPeer()
         self.serviceBrowser.startBrowsingForPeers()
+    }
+
+    func stop() {
+        self.serviceAdvertiser.stopAdvertisingPeer()
+        self.serviceBrowser.stopBrowsingForPeers()
     }
 
     func sendMessage(_ message: String) -> Result<Bool, Error> {

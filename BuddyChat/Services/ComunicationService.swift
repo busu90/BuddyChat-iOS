@@ -5,7 +5,8 @@ protocol ComunicationServiceDelegate: class {
     func activeUsersChanged(_ connectedDevices: [String])
 }
 
-protocol ComunicationService {
+protocol ComunicationService: NSObject {
     func start(with delegate: ComunicationServiceDelegate)
+    func stop()
     func sendMessage(_ message: String) -> Result<Bool, Error>
 }
