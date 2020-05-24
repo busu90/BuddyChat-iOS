@@ -1,20 +1,24 @@
 import Foundation
 import CoreBluetooth
+import UIKit
 
 final class BLEPeripheralComunicationService: NSObject, ComunicationService {
     static let serviceUUID = CBUUID(string: "01675e60-68b6-421b-8928-eabe5aab121a")
     static let characteristicUUID = CBUUID(string: "c5bb8525-086b-4637-b4cb-b92f9d992d82")
+    static let eomId = "EOM"
+    
     private var manager: CBPeripheralManager!
 
-    var transferCharacteristic: CBMutableCharacteristic?
-    var connectedCentrals: [CBCentral] = []
-    var datas: [CBCentral: Data] = [:]
-    var dataToSend = Data()
-    var sendDataIndex: Int = 0
+    private let serialQueue = DispatchQueue(label: "peripheral.serial.queue")
+
+    private var transferCharacteristic: CBMutableCharacteristic?
+    private var connectedCentrals: [CBCentral] = []
+    private var incommingMsgs: [CBCentral: Data] = [:]
+    private var outgoingMsgs: [Data] = []
+    private var sendDataIndex: Int = 0
 
     private weak var delegate : ComunicationServiceDelegate?
     private var readyToStart = false
-    private var sendingEOM = false
 
     override init() {
         super.init()
@@ -38,12 +42,21 @@ final class BLEPeripheralComunicationService: NSObject, ComunicationService {
     }
 
     func sendMessage(_ message: String) -> Result<Bool, Error> {
-        guard !connectedCentrals.isEmpty else { return .failure(CustomError(description: NSLocalizedString("No users connected yet!", comment: "")))}
-        dataToSend = message.data(using: .utf8)!
-        sendDataIndex = 0
-        sendData()
-        //delegate?.didRecieveMessage(Message(message: message, user: "ME", isFromMe: true))
+        guard !message.isEmpty else { return .failure(CustomError(description: NSLocalizedString("Cannot send empty message!", comment: ""))) }
+        guard !connectedCentrals.isEmpty, transferCharacteristic != nil else { return .failure(CustomError(description: NSLocalizedString("No users connected yet!", comment: "")))}
+        var toSend = "Anonimous,\(message)"
+        if let uuid = UIDevice.current.identifierForVendor?.uuidString {
+            toSend = "\(uuid),\(message)"
+        }
+        addMessageToQueue(toSend.data(using: .utf8)!)
         return .success(true)
+    }
+
+    private func addMessageToQueue(_ message: Data) {
+        serialQueue.async { [weak self] in
+            self?.outgoingMsgs.append(message)
+            self?.sendData()
+        }
     }
 
     private func startAdvertising() {
@@ -51,67 +64,36 @@ final class BLEPeripheralComunicationService: NSObject, ComunicationService {
     }
 
     private func sendData() {
-        guard !connectedCentrals.isEmpty else { return }
-        guard let transferCharacteristic = transferCharacteristic else {
-            return
-        }
+        serialQueue.async { [weak self] in
+            guard let transferCharacteristic = self?.transferCharacteristic, let connectedCentrals = self?.connectedCentrals, !connectedCentrals.isEmpty else { return }
 
-        // First up, check if we're meant to be sending an EOM
-        if sendingEOM {
-            // send it
-            let didSend = manager.updateValue("EOM".data(using: .utf8)!, for: transferCharacteristic, onSubscribedCentrals: nil)
-            // Did it send?
-            if didSend {
-                sendingEOM = false
-            }
-            // It didn't send, so we'll exit and wait for peripheralManagerIsReadyToUpdateSubscribers to call sendData again
-            return
-        }
-
-        // We're not sending an EOM, so we're sending data
-        // Is there any left to send?
-        if sendDataIndex >= dataToSend.count {
-            // No data left.  Do nothing
-            return
-        }
-
-        // There's data left, so send until the callback fails, or we're done.
-        var didSend = true
-        while didSend {
-
-            // Work out how big it should be
-            var amountToSend = dataToSend.count - sendDataIndex
-            amountToSend = min(amountToSend, connectedCentrals[0].maximumUpdateValueLength)
-
-            // Copy out the data we want
-            let chunk = dataToSend.subdata(in: sendDataIndex..<(sendDataIndex + amountToSend))
-
-            // Send it
-            didSend = manager.updateValue(chunk, for: transferCharacteristic, onSubscribedCentrals: nil)
-
-            // If it didn't work, drop out and wait for the callback
-            if !didSend {
-                return
-            }
-
-            // It did send, so update our index
-            sendDataIndex += amountToSend
-            // Was it the last one?
-            if sendDataIndex >= dataToSend.count {
-                // It was - send an EOM
-
-                // Set this so if the send fails, we'll send it next time
-                sendingEOM = true
-
-                //Send it
-                let eomSent = manager.updateValue("EOM".data(using: .utf8)!,
-                                                             for: transferCharacteristic, onSubscribedCentrals: nil)
-
-                if eomSent {
-                    // It sent; we're all done
-                    sendingEOM = false
+            while true {
+                guard let messages = self?.outgoingMsgs, !messages.isEmpty else { return }
+                //if message is empty send end of message flag
+                if messages[0].isEmpty {
+                    let didSend = self?.manager.updateValue(BLEPeripheralComunicationService.eomId.data(using: .utf8)!, for: transferCharacteristic, onSubscribedCentrals: nil) ?? false
+                    if didSend {
+                        self?.outgoingMsgs.removeFirst()
+                        continue
+                    } else {
+                        return
+                    }
                 }
-                return
+
+                // Work out how big it should be
+                let amountToSend = min(messages[0].count, connectedCentrals[0].maximumUpdateValueLength)
+
+                // Copy out the data we want
+                let chunk = messages[0].subdata(in: 0..<amountToSend)
+
+                // Send it
+                let didSend = self?.manager.updateValue(chunk, for: transferCharacteristic, onSubscribedCentrals: nil) ?? false
+                // update the reminder
+                if didSend {
+                    self?.outgoingMsgs[0] = messages[0].subdata(in: amountToSend..<messages[0].count)
+                } else {
+                    return
+                }
             }
         }
     }
@@ -119,10 +101,6 @@ final class BLEPeripheralComunicationService: NSObject, ComunicationService {
 
 extension BLEPeripheralComunicationService : CBPeripheralManagerDelegate {
     private func setupPeripheral() {
-
-        // Build our service.
-
-        // Start with the CBMutableCharacteristic.
         let transferCharacteristic = CBMutableCharacteristic(type: BLEPeripheralComunicationService.characteristicUUID,
                                                          properties: [.notify, .writeWithoutResponse],
                                                          value: nil,
@@ -179,18 +157,20 @@ extension BLEPeripheralComunicationService : CBPeripheralManagerDelegate {
         for aRequest in requests {
             guard let requestValue = aRequest.value,
                 let stringFromData = String(data: requestValue, encoding: .utf8) else { continue }
-            var data = datas[aRequest.central] ?? Data()
-            if stringFromData == "EOM" {
-                let message = String(data: data, encoding: .utf8) ?? ""
+            var data = incommingMsgs[aRequest.central] ?? Data()
+            if stringFromData == BLEPeripheralComunicationService.eomId {
+                let message = Message(data, userId: UIDevice.current.identifierForVendor?.uuidString)
                 DispatchQueue.main.async() {
-                    self.delegate?.didRecieveMessage(Message(message: message, user: nil, isFromMe: false))
+                    self.delegate?.didRecieveMessage(message)
                 }
-                datas.removeValue(forKey: aRequest.central)
+                incommingMsgs.removeValue(forKey: aRequest.central)
+                addMessageToQueue(data)
             } else {
                 data.append(requestValue)
-                datas[aRequest.central] = data
+                incommingMsgs[aRequest.central] = data
             }
         }
+        peripheral.respond(to: requests[0], withResult: .success)
     }
 }
 

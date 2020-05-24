@@ -1,15 +1,16 @@
 import Foundation
 import CoreBluetooth
+import UIKit
 
 final class BLECentralComunicationService: NSObject, ComunicationService {
     private var manager: CBCentralManager!
     private var discoveredPeripheral: CBPeripheral?
     private var transferCharacteristic: CBCharacteristic?
 
-    private var data = Data()
-    private var dataToSend = Data()
-    private var sendDataIndex: Int = 0
-    private var sendingEOM = false
+    private var incommingMsg = Data()
+    private var outgoingMsgs: [Data] = []
+
+    private let serialQueue = DispatchQueue(label: "central.serial.queue")
 
     private weak var delegate : ComunicationServiceDelegate?
     private var readyToStart = false
@@ -37,46 +38,42 @@ final class BLECentralComunicationService: NSObject, ComunicationService {
     }
 
     func sendMessage(_ message: String) -> Result<Bool, Error> {
-        dataToSend = message.data(using: .utf8)!
-        sendDataIndex = 0
-        writeData()
-        return .success(true)
+        guard !message.isEmpty else { return .failure(CustomError(description: NSLocalizedString("Cannot send empty message!", comment: ""))) }
+        guard discoveredPeripheral != nil && transferCharacteristic != nil else { return .failure(CustomError(description: NSLocalizedString("Did not connect to a chat yet!", comment: ""))) }
+        var toSend = "Anonimous,\(message)"
+        if let uuid = UIDevice.current.identifierForVendor?.uuidString {
+            toSend = "\(uuid),\(message)"
+        }
+        serialQueue.async { [weak self] in
+            self?.outgoingMsgs.append(toSend.data(using: .utf8)!)
+            self?.writeData()
+        }
+        return .success(false)
     }
 
     private func writeData() {
+        serialQueue.async { [weak self] in
+            guard let discoveredPeripheral = self?.discoveredPeripheral, let transferCharacteristic = self?.transferCharacteristic else { return }
+            while discoveredPeripheral.canSendWriteWithoutResponse {
+                guard let messages = self?.outgoingMsgs, !messages.isEmpty else { return }
+                //if message is empty send end of message flag
+                if messages[0].isEmpty {
+                    discoveredPeripheral.writeValue(BLEPeripheralComunicationService.eomId.data(using: .utf8)!, for: transferCharacteristic, type: .withoutResponse)
+                    self?.outgoingMsgs.removeFirst()
+                    continue
+                }
 
-        guard let discoveredPeripheral = discoveredPeripheral,
-                let transferCharacteristic = transferCharacteristic
-            else { return }
+                // Work out how big it should be
+                let amountToSend = min(messages[0].count, discoveredPeripheral.maximumWriteValueLength (for: .withoutResponse))
 
-        if sendDataIndex >= dataToSend.count && !sendingEOM {
-            // No data left.  Do nothing
-            return
-        }
-        // There's data left, so send until we have to stop
-        while discoveredPeripheral.canSendWriteWithoutResponse {
-            if sendDataIndex >= dataToSend.count {
-                discoveredPeripheral.writeValue("EOM".data(using: .utf8)!, for: transferCharacteristic, type: .withoutResponse)
-                sendingEOM = false
-                return
-            }
+                // Copy out the data we want
+                let chunk = messages[0].subdata(in: 0..<amountToSend)
 
-            // Work out how big it should be
-            var amountToSend = dataToSend.count - sendDataIndex
-            amountToSend = min(amountToSend, discoveredPeripheral.maximumWriteValueLength (for: .withoutResponse))
+                // update the reminder
+                self?.outgoingMsgs[0] = messages[0].subdata(in: amountToSend..<messages[0].count)
 
-            // Copy out the data we want
-            let chunk = dataToSend.subdata(in: sendDataIndex..<(sendDataIndex + amountToSend))
-
-            // Send it
-            discoveredPeripheral.writeValue(chunk, for: transferCharacteristic, type: .withoutResponse)
-
-            // It did send, so update our index
-            sendDataIndex += amountToSend
-            // Was it the last one?
-            if sendDataIndex >= dataToSend.count {
-                // No data left.  Do nothing
-                sendingEOM = true
+                // Send it
+                discoveredPeripheral.writeValue(chunk, for: transferCharacteristic, type: .withoutResponse)
             }
         }
     }
@@ -108,6 +105,7 @@ extension BLECentralComunicationService : CBCentralManagerDelegate {
 
         // If we've gotten this far, we're connected, but we're not subscribed, so we just disconnect
         manager.cancelPeripheralConnection(discoveredPeripheral)
+
     }
 
     func centralManagerDidUpdateState(_ central: CBCentralManager) {
@@ -136,8 +134,6 @@ extension BLECentralComunicationService : CBCentralManagerDelegate {
 
     func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
         manager.stopScan()
-
-        data.removeAll(keepingCapacity: false)
 
         peripheral.delegate = self
 
@@ -191,14 +187,14 @@ extension BLECentralComunicationService : CBPeripheralDelegate {
         guard let characteristicData = characteristic.value, let stringFromData = String(data: characteristicData, encoding: .utf8) else { return }
 
         // Have we received the end-of-message token?
-        if stringFromData == "EOM" {
-            let message = String(data: self.data, encoding: .utf8) ?? ""
+        if stringFromData == BLEPeripheralComunicationService.eomId {
+            let message = Message(incommingMsg, userId: UIDevice.current.identifierForVendor?.uuidString)
             DispatchQueue.main.async() {
-                self.delegate?.didRecieveMessage(Message(message: message, user: nil, isFromMe: false))
+                self.delegate?.didRecieveMessage(message)
             }
-            data.removeAll(keepingCapacity: false)
+            self.incommingMsg.removeAll(keepingCapacity: false)
         } else {
-            data.append(characteristicData)
+            self.incommingMsg.append(characteristicData)
         }
     }
 
